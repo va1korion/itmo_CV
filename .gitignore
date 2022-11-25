@@ -1,0 +1,5 @@
+.gitignore
+.idea
+venv
+*.mp4
+*.png
