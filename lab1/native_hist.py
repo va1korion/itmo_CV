@@ -1,68 +1,63 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 
 
 def just_show(frame) -> (np.array, np.array):
-    img = cv2.imread('example_image.png', 0)
-    hist, bins = np.histogram(img.flatten(), 256, [0,256])
+    hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
     cdf = hist.cumsum()
     cdf_normalized = cdf * float(hist.max()) / cdf.max()
-    plt.plot(cdf_normalized, color='b')
-    plt.hist(img.flatten(), 256, [0,256], color='r')
-    plt.xlim([0,256])
-    plt.legend(('cdf','histogram'), loc='upper left')
-    plt.show()
+    #plt.plot(cdf_normalized, color='b')
+    #plt.hist(frame.flatten(), 256, [0, 256], color='r')
+    #plt.xlim([0, 256])
+    #plt.legend(('cdf', 'histogram'), loc='upper left')
+    return frame, frame.flatten()
+
 
 def equalize(frame) -> (np.array, np.array):
-    cdf_m = np.ma.masked_equal(cdf,0)
+    hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
+    cdf = hist.cumsum()
+    cdf_m = np.ma.masked_equal(cdf, 0)
     cdf_m = (cdf_m - cdf_m.min())*255/(cdf_m.max()-cdf_m.min())
-    cdf = np.ma.filled(cdf_m,0).astype('uint8')
-    img2 = cdf[img]
-    cv2.imwrite("equalized_image.png", img2)
+    cdf = np.ma.filled(cdf_m, 0).astype('uint8')
+    frame = cdf[frame]
+    return frame, frame.flatten()
 
 
-hist, bins = np.histogram(img2.flatten(),256,[0,256])
-cdf = hist.cumsum()
-cdf_normalized = cdf * float(hist.max()) / cdf.max()
-plt.plot(cdf_normalized, color = 'b')
-plt.hist(img2.flatten(),256,[0,256], color='r')
-plt.xlim([0,256])
-plt.legend(('cdf','histogram'), loc='upper left')
-plt.show()
+def dark_magic(histr):
+    hist_w = 512
+    hist_h = 400
+    bin_w = int(round(hist_w / 256))
+    histImage = np.zeros((512, 400), dtype=np.uint8)
+    cv2.normalize(histr, histr, alpha=0, beta=512, norm_type=cv2.NORM_MINMAX)
+    for i in range(1, 256):
+        cv2.line(histImage, (bin_w * (i - 1), hist_h - int(histr[i - 1])),
+                 (bin_w * (i), hist_h - int(histr[i])),
+                 (255, 0, 0), thickness=2)
+    return histImage
 
-cam = cv2.VideoCapture("./video_example.mp4")
+
+cam = cv2.VideoCapture("./examples/video_example.mp4")
 flag = False
-plot = plt.subplot(1, 1, 1)
-plt.ion()
 
 
 # working the first frame
 ret, frame = cam.read()
-if ret:
-    histr = cv2.calcHist([frame], [0], None, [256], [0, 256])
-    cv2.imshow('Frame', frame)
-    # showing hist
-    # plot = plot.imshow()
 
-while (cam.isOpened):
+while cam.isOpened:
     ret, frame = cam.read()
     if ret:
-        # equalizing if flag is set
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # or convert
+        frame = np.array(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+        # magic happens here
         if flag:
-            frame = cv2.equalizeHist(frame)
+            frame, hist = equalize(frame)
+        else:
+            frame, hist = just_show(frame)
 
-        hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
-
-        # calculating hist
-        histr = cv2.calcHist([frame], [0], None, [256], [0, 256])
-
-        # showing frame
+        histImage = dark_magic(hist)
         cv2.imshow('Frame', frame)
-
-        # showing hist
-        # plot.set_data(plt.hist(histr))
+        cv2.imshow('Hist', histImage)
 
         # Press Q on keyboard to exit
         if cv2.waitKey(25) & 0xFF == ord('h'):
@@ -70,15 +65,8 @@ while (cam.isOpened):
         # Press Q on keyboard to exit
         if cv2.waitKey(25) & 0xFF == ord('q'):
             break
-
-    # Break the loop
+        # Break the loop
     else:
         break
 
-    # When everything done, release
-    # the video capture object
 cam.release()
-plt.ioff()
-
-# Closes all the frames
-cv2.destroyAllWindows()
