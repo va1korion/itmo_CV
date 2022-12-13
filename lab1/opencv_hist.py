@@ -1,7 +1,8 @@
 import cv2
-import os
 import numpy as np
 import matplotlib.pyplot as plt
+from time import perf_counter
+
 
 cam = cv2.VideoCapture("./examples/video_example.mp4")
 flag = False
@@ -23,10 +24,11 @@ def dark_magic(histr):
 
 
 ret, frame = cam.read()
-while (cam.isOpened):
+while cam.isOpened:
     ret, frame = cam.read()
     if ret:
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # or convert
+        start = perf_counter()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # magic happens here
         if flag:
@@ -38,6 +40,8 @@ while (cam.isOpened):
         cv2.imshow('Frame', frame)
         cv2.imshow('Hist', histImage)
 
+        end = perf_counter()
+        print("OpenCV frame time: " + str(end - start))
         # showing hist
         # plot.set_data(plt.hist(histr))
 
@@ -54,7 +58,6 @@ while (cam.isOpened):
     # When everything done, release
     # the video capture object
 cam.release()
-plt.ioff()
 
 # Closes all the frames
 cv2.destroyAllWindows()

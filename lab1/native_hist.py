@@ -1,18 +1,11 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
-
+from time import perf_counter
 
 def just_show(frame) -> (np.array, np.array):
     hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
     cdf = hist.cumsum()
-    cdf_normalized = cdf * float(hist.max()) / cdf.max()
-    #plt.plot(cdf_normalized, color='b')
-    #plt.hist(frame.flatten(), 256, [0, 256], color='r')
-    #plt.xlim([0, 256])
-    #plt.legend(('cdf', 'histogram'), loc='upper left')
-    return frame, frame.flatten()
+    return frame, hist
 
 
 def equalize(frame) -> (np.array, np.array):
@@ -22,10 +15,13 @@ def equalize(frame) -> (np.array, np.array):
     cdf_m = (cdf_m - cdf_m.min())*255/(cdf_m.max()-cdf_m.min())
     cdf = np.ma.filled(cdf_m, 0).astype('uint8')
     frame = cdf[frame]
-    return frame, frame.flatten()
+    return frame, hist
 
 
+# one stupid way to draw hists
 def dark_magic(histr):
+    histr = histr.reshape(256, 1)
+    histr = 255 * histr / histr[-1]
     hist_w = 512
     hist_h = 400
     bin_w = int(round(hist_w / 256))
@@ -48,6 +44,7 @@ ret, frame = cam.read()
 while cam.isOpened:
     ret, frame = cam.read()
     if ret:
+        start = perf_counter()
         frame = np.array(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
         # magic happens here
         if flag:
@@ -59,10 +56,11 @@ while cam.isOpened:
         cv2.imshow('Frame', frame)
         cv2.imshow('Hist', histImage)
 
-        # Press Q on keyboard to exit
+        end = perf_counter()
+        print("Native frame time: "+str(end - start))
+
         if cv2.waitKey(25) & 0xFF == ord('h'):
             flag = not flag
-        # Press Q on keyboard to exit
         if cv2.waitKey(25) & 0xFF == ord('q'):
             break
         # Break the loop
