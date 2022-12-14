@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torchvision.transforms.functional as F
-from torchvision.models import alexnet, resnet50, vgg16, AlexNet_Weights, ResNet50_Weights, VGG16_Weights
+from torchvision.models import inception_v3, swin_s, vit_l_32, Inception_V3_Weights, Swin_S_Weights, ViT_L_32_Weights
 
 plt.rcParams["savefig.bbox"] = 'tight'
 
@@ -32,32 +32,9 @@ def read_image(i):
     return read_image(f"{i}")
 
 
-def create_res_net50_model():
-    from torchvision.models import resnet50, ResNet50_Weights
-    # Step 1: Initialize model with the best available weights
-    weights = ResNet50_Weights.DEFAULT
-    model = resnet50(weights=weights)
-    model.eval()
-
-    # Step 2: Initialize the inference transforms
-    return model
-
-
 def create_model(weights, model):
     modell = model(weights=weights)
     return modell.eval()
-
-
-def create_alex_net_model(weights, model):
-    from torchvision.models import alexnet, AlexNet_Weights
-
-    # Step 1: Initialize model with the best available weights
-    weights = AlexNet_Weights.DEFAULT
-    model = alexnet(weights=weights)
-    model.eval()
-
-    # Step 2: Initialize the inference transforms
-    return model
 
 
 def create_predict(weights, img, model):
@@ -69,22 +46,26 @@ def create_predict(weights, img, model):
     return model(batch).squeeze(0).softmax(0)
 
 
-def create_vgg16_model():
-    from torchvision.models import vgg16, VGG16_Weights
+def predict(weights, model, j, act):
+    pred = create_predict(weights.DEFAULT, img, model)
+    top5_prob, top5_catid = torch.topk(pred, 5)
+    top5_catid_temp = []
+    for temp in top5_catid:
+        top5_catid_temp.append(weights.DEFAULT.meta["categories"][temp].lower())
 
-    # Step 1: Initialize model with the best available weights
-    weights = VGG16_Weights.DEFAULT
-    model = vgg16(weights=weights)
-    model.eval()
-
-    # Step 2: Initialize the inference transforms
-    return model
+    top1_prob, top1_catid = torch.topk(pred, 1)
+    if weights.DEFAULT.meta["categories"][top1_catid].lower() == act.lower():
+        acc_1[j] += 1.0
+    if act.lower() in top5_catid_temp:
+        acc_5[j] += 1.0
+    show_pred(pred, "alex_net", weights.DEFAULT)
 
 
 if __name__ == '__main__':
-    model_alex_net = create_model(AlexNet_Weights.DEFAULT, alexnet)
-    model_res_net = create_model(ResNet50_Weights.DEFAULT, resnet50)
-    model_vgg_16 = create_model(VGG16_Weights.DEFAULT, vgg16)
+    model_inception = create_model(Inception_V3_Weights.DEFAULT, inception_v3)  # classic inception
+    model_swin = create_model(Swin_S_Weights.DEFAULT, swin_s)   # smaller transformer
+    model_vit = create_model(ViT_L_32_Weights.DEFAULT, vit_l_32)   # bigger transformer
+
     from os import listdir
     from os.path import isfile, join
 
@@ -96,7 +77,6 @@ if __name__ == '__main__':
 
     MYPATH = 'data/'
     lables = [f for f in listdir(MYPATH) if not isfile(join(MYPATH, f))]
-    lables
 
     data_images = []
     for l in lables:
@@ -110,44 +90,13 @@ if __name__ == '__main__':
         print("=========================")
         print(f"exp{data}")
         print("=========================")
-        pred = create_predict(AlexNet_Weights.DEFAULT, img, model_alex_net)
         act = data.split('/')[1].split('\\')[0]
-        top5_prob, top5_catid = torch.topk(pred, 5)
-        top5_catid_temp = []
-        for temp in top5_catid:
-            top5_catid_temp.append(AlexNet_Weights.DEFAULT.meta["categories"][temp].lower())
-        top1_prob, top1_catid = torch.topk(pred, 1)
-        if AlexNet_Weights.DEFAULT.meta["categories"][top1_catid].lower() == act.lower():
-            acc_1[0] += 1.0
-        if act.lower() in top5_catid_temp:
-            acc_5[0] += 1.0
 
-        show_pred(pred, "alex_net", AlexNet_Weights.DEFAULT)
-        pred = create_predict(ResNet50_Weights.DEFAULT, img, model_res_net)
-        top5_prob, top5_catid = torch.topk(pred, 5)
-        top5_catid_temp = []
-        for temp in top5_catid:
-            top5_catid_temp.append(AlexNet_Weights.DEFAULT.meta["categories"][temp].lower())
-        top1_prob, top1_catid = torch.topk(pred, 1)
-        if (AlexNet_Weights.DEFAULT.meta["categories"][top1_catid].lower() == act.lower()):
-            acc_1[1] += 1.0
-        if (act.lower() in top5_catid_temp):
-            acc_5[1] += 1.0
-        show_pred(pred, "res net 50", ResNet50_Weights.DEFAULT)
+        predict(Inception_V3_Weights, model_inception, 0, act)
+        predict(Swin_S_Weights, model_swin, 0, act)
+        predict(ViT_L_32_Weights, model_vit, 0, act)
 
-        pred = create_predict(VGG16_Weights.DEFAULT, img, model_vgg_16)
-        top5_prob, top5_catid = torch.topk(pred, 5)
-        top5_catid_temp = []
-        for temp in top5_catid:
-            top5_catid_temp.append(AlexNet_Weights.DEFAULT.meta["categories"][temp].lower())
-        top1_prob, top1_catid = torch.topk(pred, 1)
-        if (AlexNet_Weights.DEFAULT.meta["categories"][top1_catid].lower() == act.lower()):
-            acc_1[2] += 1.0
-        if (act.lower() in top5_catid_temp):
-            acc_5[2] += 1.0
-        show_pred(pred, "vgg 16", VGG16_Weights.DEFAULT)
-
-    model_names = ['alex_net', 'res net 50', 'vgg16']
+    model_names = ['inception', 'SWIN', 'ViT']
     i = 0
     for n in model_names:
         print(n + 'top 1 accuracy = ' + str(acc_1[i] / len(data_images)))
