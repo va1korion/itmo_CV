@@ -1,9 +1,11 @@
+import decimal
+from time import perf_counter
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
 import torchvision.transforms.functional as F
-from torchvision.models import inception_v3, swin_s, vit_l_32, Inception_V3_Weights, Swin_S_Weights, ViT_L_32_Weights
+from torchvision.models import inception_v3, swin_s, vit_l_32, alexnet, Inception_V3_Weights, Swin_S_Weights, ViT_L_32_Weights, AlexNet_Weights
 
 plt.rcParams["savefig.bbox"] = 'tight'
 
@@ -39,10 +41,7 @@ def create_model(weights, model):
 
 def create_predict(weights, img, model):
     preprocess = weights.transforms()
-
-    # Step 3: Apply inference preprocessing transforms
     batch = preprocess(img).unsqueeze(0)
-
     return model(batch).squeeze(0).softmax(0)
 
 
@@ -58,13 +57,14 @@ def predict(weights, model, j, act):
         acc_1[j] += 1.0
     if act.lower() in top5_catid_temp:
         acc_5[j] += 1.0
-    show_pred(pred, "alex_net", weights.DEFAULT)
+    show_pred(pred, "",  weights.DEFAULT)
 
 
 if __name__ == '__main__':
     model_inception = create_model(Inception_V3_Weights.DEFAULT, inception_v3)  # classic inception
     model_swin = create_model(Swin_S_Weights.DEFAULT, swin_s)   # smaller transformer
     model_vit = create_model(ViT_L_32_Weights.DEFAULT, vit_l_32)   # bigger transformer
+    model_alex = create_model(AlexNet_Weights.DEFAULT, alexnet)  # good ole alexNet
 
     from os import listdir
     from os.path import isfile, join
@@ -83,22 +83,48 @@ if __name__ == '__main__':
         for d in listdir(join(MYPATH, l)):
             data_images.append(join(MYPATH, l, d))
 
-    acc_5 = [0, 0, 0]
-    acc_1 = [0, 0, 0]
+    acc_5 = [0, 0, 0, 0]
+    acc_1 = [0, 0, 0, 0]
     for data in data_images:
+
         img = read_image(data)
         print("=========================")
         print(f"exp{data}")
         print("=========================")
         act = data.split('/')[1].split('\\')[0]
 
+        print("Inception prediction")
+        start = perf_counter()
         predict(Inception_V3_Weights, model_inception, 0, act)
-        predict(Swin_S_Weights, model_swin, 0, act)
-        predict(ViT_L_32_Weights, model_vit, 0, act)
+        end = perf_counter()
+        print("Inception frame time: " + str(end - start))
 
-    model_names = ['inception', 'SWIN', 'ViT']
+
+        print("=========================")
+        print("SWIN prediction")
+        start = perf_counter()
+        predict(Swin_S_Weights, model_swin, 1, act)
+        end = perf_counter()
+        print("SWIN frame time: " + str(end - start))
+
+        print("=========================")
+        print("ViT prediction")
+        start = perf_counter()
+        predict(ViT_L_32_Weights, model_vit, 2, act)
+        end = perf_counter()
+        print("ViT frame time: " + str(end - start))
+
+        print("=========================")
+        print("Alex_net prediction")
+        start = perf_counter()
+        predict(AlexNet_Weights, model_alex, 3, act)
+        end = perf_counter()
+        print("AlexNet frame time: " + str(end - start))
+
+    model_names = ['inception', 'SWIN', 'ViT', "alexnet"]
     i = 0
+    print("=========================\n \n")
     for n in model_names:
-        print(n + 'top 1 accuracy = ' + str(acc_1[i] / len(data_images)))
-        print(n + 'top 5 accuracy = ' + str(acc_5[i] / len(data_images)))
+        print(n + ' top 1 accuracy = ' + str(acc_1[i] / len(data_images)))
+        print(n + ' top 5 accuracy = ' + str(acc_5[i] / len(data_images)))
         i += 1
